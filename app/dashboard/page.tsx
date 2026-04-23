@@ -41,9 +41,13 @@ export default async function Dashboard() {
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-gray-900">QuickBooks Connection</h2>
           {isConnected ? (
-            <div className="mt-2 flex items-center gap-2 text-green-700">
-              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-              <span className="text-sm font-medium">Connected to QuickBooks Online (Company ID: {connection.realm_id})</span>
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center gap-2 text-green-700">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-sm font-medium">Connected to QuickBooks Online (Company ID: {connection.realm_id})</span>
+              </div>
+              {/* Fetch and display the actual company name */}
+              <QuickBooksInfo userId={user.id} />
             </div>
           ) : (
             <div className="mt-2">
@@ -74,5 +78,38 @@ export default async function Dashboard() {
         </div>
       </div>
     </main>
+  );
+}
+
+// New component to fetch and display QuickBooks company info
+async function QuickBooksInfo({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  const { data: connection } = await supabase
+    .from('quickbooks_connections')
+    .select('access_token, realm_id')
+    .eq('user_id', userId)
+    .single();
+
+  if (!connection) return null;
+
+  // Use sandbox URL for testing; change to production when ready
+  const baseUrl = 'https://sandbox-quickbooks.api.intuit.com/v3/company';
+  const url = `${baseUrl}/${connection.realm_id}/companyinfo/${connection.realm_id}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${connection.access_token}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) return <p className="text-sm text-red-600">Could not fetch company information.</p>;
+
+  const { CompanyInfo } = await response.json();
+
+  return (
+    <p className="text-sm text-gray-600">
+      Company: <span className="font-semibold">{CompanyInfo.CompanyName}</span>
+    </p>
   );
 }
